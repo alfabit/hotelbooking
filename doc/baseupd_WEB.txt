@@ -1,0 +1,959 @@
+--процедуры для ВЕБ--------------------------------------------------------------------------
+--добавление, редактирование, контрагента по email------------------------
+--(возвращает ID контрагента при добавлении или изменении. При смене пароля если пароль не совпадает то возвращает 0)
+IF (SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_NAME LIKE '%KontragentAdd%') <> 0
+DROP PROCEDURE [dbo].KontragentAdd
+EXEC( 'CREATE PROCEDURE [dbo].[KontragentAdd]
+
+	@email nvarchar(63),         --епочта
+	@pass nvarchar(63),          --пароль
+	@FName nvarchar(63),         --Фамилия
+	@MName nvarchar(63),         --Имя
+	@LName nvarchar(63),         --Отчество
+	@birth datetime,             --дата рождения
+	@Country_ID int = 1,         --код страны (получить список стран SELECT Country_ID, CountryName FROM Country)
+	@Addr nvarchar(63),          --адрес
+	@Passport nvarchar(255),     --паспорт
+	@Contact nvarchar(255),      --контакт
+	@newpass nvarchar(63) = '''' --новый пароль при смене пароля
+AS
+
+DECLARE @Kontr_ID int
+
+	SET NOCOUNT ON;
+
+	IF @email = '''' 
+	BEGIN
+		SELECT 0
+		RETURN 0
+	END
+
+	--проверка на совпадение по емайл
+	SET @Kontr_ID = ISNULL((SELECT TOP 1 Kontr_ID FROM KontrAttr WHERE AtType_ID = 3 AND AttrValue = @email),0)
+
+	IF @Kontr_ID = 0
+	BEGIN --добавляем контрагента и атрибуты
+		INSERT INTO Kontragents (KontrName) VALUES (@FName+'' ''+@MName+'' ''+@LName)
+		SET @Kontr_ID = (SELECT SCOPE_IDENTITY())
+		INSERT INTO KontrAttr (AttrValue, AtType_ID, Kontr_ID) VALUES (@email, 3, @Kontr_ID)
+		INSERT INTO KontrAttr (AttrValue, AtType_ID, Kontr_ID) VALUES (@pass, 37, @Kontr_ID)
+--		IF @birth <> ''''
+			INSERT INTO KontrAttr (AttrValue, AtType_ID, Kontr_ID) VALUES (CONVERT(VARCHAR,@birth,104), 15, @Kontr_ID)
+--		IF @Country_ID <> 0
+			INSERT INTO KontrAttr (AttrValue, AtType_ID, Kontr_ID) SELECT CountryName, 27, @Kontr_ID FROM Country WHERE Country_ID = @Country_ID
+		INSERT INTO KontrAttr (AttrValue, AtType_ID, Kontr_ID) VALUES (@Addr, 4, @Kontr_ID)
+--		IF @Passport <> ''''
+			INSERT INTO KontrAttr (AttrValue, AtType_ID, Kontr_ID) VALUES (@Passport, 17, @Kontr_ID)
+--		IF @Contact <> ''''
+			INSERT INTO KontrAttr (AttrValue, AtType_ID, Kontr_ID) VALUES (@Contact, 9, @Kontr_ID)												
+	
+		INSERT INTO BindKontrGroups(Kontr_ID, KontrG_ID) VALUES (@Kontr_ID, 17)
+	END
+	ELSE
+	BEGIN
+		IF @pass = (SELECT TOP 1 AttrValue FROM KontrAttr WHERE AtType_ID = 37 AND AttrValue = @pass AND Kontr_ID = @Kontr_ID)	
+		BEGIN
+			UPDATE Kontragents SET KontrName = @FName+'' ''+@MName+'' ''+@LName WHERE Kontr_ID = @Kontr_ID
+			UPDATE KontrAttr SET AttrValue = @email WHERE AtType_ID = 3 AND Kontr_ID = @Kontr_ID
+			IF @birth <> '''' 
+				UPDATE KontrAttr SET AttrValue = CONVERT(VARCHAR,@birth,104) WHERE AtType_ID = 15 AND Kontr_ID = @Kontr_ID			
+			IF @Country_ID <> 0
+				UPDATE KontrAttr SET AttrValue = (SELECT CountryName FROM Country WHERE Country_ID = @Country_ID) WHERE AtType_ID = 27 AND Kontr_ID = @Kontr_ID
+			UPDATE KontrAttr SET AttrValue = @Addr WHERE AtType_ID = 4 AND Kontr_ID = @Kontr_ID			
+			IF @Passport <> ''''
+				UPDATE KontrAttr SET AttrValue = @Passport WHERE AtType_ID = 17 AND Kontr_ID = @Kontr_ID			
+			IF @Contact <> ''''
+				UPDATE KontrAttr SET AttrValue = @Contact WHERE AtType_ID = 9 AND Kontr_ID = @Kontr_ID			
+			IF @newpass <> ''''
+				UPDATE KontrAttr SET AttrValue = @newpass WHERE AtType_ID = 37 AND Kontr_ID = @Kontr_ID			
+		END
+		ELSE SET @Kontr_ID = 0
+	END
+	
+	--(возвращает ID контрагента если пароль не совпадает то возвращает 0 при изменении данных регистрации)
+	SELECT @Kontr_ID
+')
+
+--проверка регистрации клиента (емайл пароль)-----------------------------------
+--возвращает данные контрагента по его email, если такого нет NULL-------
+--ID, ФИО, email, пароль, день рождения, страна, адрес, паспорт, контакт-----
+IF (SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_NAME LIKE '%KontragentTest%') <> 0
+DROP PROCEDURE [dbo].KontragentTest
+EXEC( 'CREATE PROCEDURE [dbo].[KontragentTest]
+	@email nvarchar(63), --
+	@pass nvarchar(63)   --
+AS
+DECLARE @Kontr_ID int
+
+	SET NOCOUNT ON;
+
+	--выборка данных по емайл
+	SET @Kontr_ID = ISNULL((SELECT TOP 1 Kontr_ID FROM KontrAttr WHERE AtType_ID = 3 AND AttrValue = @email),0)
+
+	--(возвращает пароль из базы или пустую строку если емайл не существует)
+	IF @Kontr_ID <> 0
+	SELECT 
+		Kontr_ID,
+		KontrName,
+		(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 3 AND Kontr_ID = K.Kontr_ID) email,
+		(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 37 AND Kontr_ID = K.Kontr_ID) Pass,
+		(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 15 AND Kontr_ID = K.Kontr_ID) birth,
+		(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 27 AND Kontr_ID = K.Kontr_ID) Country_ID,
+		(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 4 AND Kontr_ID = K.Kontr_ID) Addr,
+		(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 17 AND Kontr_ID = K.Kontr_ID) Passport,
+		(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 9 AND Kontr_ID = K.Kontr_ID) Contact
+		FROM Kontragents K WHERE Kontr_ID = @Kontr_ID
+	ELSE SELECT NULL
+')
+
+
+
+--список свободных номеров с ценами-------------------------------------
+--возвращает список свободных номеров. Номера по указанной категории сверху, затем все которые больше или равны по указанному кол-ву людей с учётом доп.мест
+--ID номера, Название номера, мест, доп.мест, категория, цена, описание--------
+IF (SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_NAME LIKE '%WEB_RoomList%') <> 0
+DROP PROCEDURE [dbo].WEB_RoomList
+EXEC( 'CREATE PROCEDURE [dbo].[WEB_RoomList]
+	@DFrom datetime,              --дата с
+	@DTo datetime,	              --дата по
+	@QAdult int,                  --взрослых
+	@QChild int,                  --детей
+	@Cat_ID int=0,                --категория 0 -если не выбрана (получение списка категорий SELECT * FROM R_Class)
+	@QRoom int=1,                 --кол-во номеров по умолчанию 1
+	@ChildAge nvarchar(255)='''', --возраст детей через запятую
+	@Client_ID int=0              --код клиента
+AS
+
+DECLARE @Price Float=0, @i float, @Kontr_ID int, @MidPlace int
+
+	SET NOCOUNT ON;
+	
+	SET @MidPlace = CEILING((@QAdult+@QChild)/@QRoom)
+	
+--выбраная категория вначале
+SELECT a.* INTO #WEB_res FROM
+(SELECT K.*, (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 8 AND Kontr_ID = K.Kontr_ID) QP --мест
+,(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 14 AND Kontr_ID = K.Kontr_ID) QPD--доп.мест
+,(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID) Cat--категория
+,0 Price
+,(SELECT Descr FROM R_Class WHERE RClassName = (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID)) AS Descript--описание класса
+FROM Kontragents K WHERE K.Kontr_ID IN (SELECT Kontr_ID FROM KontrAttr WHERE AtType_ID = 11 AND ((SELECT Fl_Serv FROM R_Class WHERE RClassName = AttrValue) IS NULL OR (SELECT Fl_Serv FROM R_Class WHERE RClassName = AttrValue) = 0))
+AND (SELECT COUNT(*) FROM Documents D WHERE DocT_ID IN (31,32,33,34,35,36) AND D.Kontr_ID = K.Kontr_ID AND D.DocDate <=@DTo AND D.DocDateTo >= @DFrom) =0
+AND K.Kontr_ID IN (SELECT Kontr_ID FROM KontrAttr WHERE AtType_ID = 11 AND AttrValue = (SELECT RClassName FROM R_Class WHERE RClass_ID = @Cat_ID))
+UNION ALL 
+SELECT K.*, (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 8 AND Kontr_ID = K.Kontr_ID) QP --мест
+,(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 14 AND Kontr_ID = K.Kontr_ID) QPD--доп.мест
+,(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID) Cat--категория
+,0 Price
+,(SELECT Descr FROM R_Class WHERE RClassName = (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID)) AS Descript--описание класса
+FROM Kontragents K WHERE K.Kontr_ID IN (SELECT Kontr_ID FROM KontrAttr WHERE AtType_ID = 11 AND ((SELECT Fl_Serv FROM R_Class WHERE RClassName = AttrValue) IS NULL OR (SELECT Fl_Serv FROM R_Class WHERE RClassName = AttrValue) = 0))
+AND (SELECT COUNT(*) FROM Documents D WHERE DocT_ID IN (31,32,33,34,35,36) AND D.Kontr_ID = K.Kontr_ID AND D.DocDate <=@DTo AND D.DocDateTo >= @DFrom) =0
+AND K.Kontr_ID NOT IN (SELECT Kontr_ID FROM KontrAttr WHERE AtType_ID = 11 AND AttrValue = (SELECT RClassName FROM R_Class WHERE RClass_ID = @Cat_ID))
+)a WHERE CAST(a.QP AS INT)+CAST(a.QPD AS INT) >= @MidPlace
+
+
+DECLARE Price_Cur CURSOR FOR
+SELECT Kontr_ID FROM #WEB_res
+
+OPEN Price_Cur;
+
+FETCH NEXT FROM Price_Cur INTO @Kontr_ID;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	SET @Price = 0
+	SET @i = CAST(@DTo - @DFrom AS FLOAT)
+	WHILE @i > 0
+	BEGIN
+		--найдем услуги для номера при бронировании
+		SET @Price = @Price + (SELECT SUM(Price) FROM
+(SELECT 
+(SELECT CASE WHEN (PriceVal = 0 OR PriceVal is Null) THEN Price ELSE PriceVal END Price FROM Goods G1 
+LEFT OUTER JOIN P_GoodPrices GP ON GP.Good_ID = G1.Good_ID AND GP.Price_ID IN 
+(SELECT Price_ID FROM (
+SELECT TOP 1 b.Price_ID, b.Fl_Gen FROM ( 
+   SELECT * FROM ( 
+
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE a.DF <> 0 AND a.DT <> 0 AND @DFrom-@i BETWEEN DTF AND DTT 
+
+   UNION ALL SELECT * FROM ( 
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE (a.DF = 0 OR a.DT = 0) AND (CAST(@DFrom-@i as FLOAT)-ROUND(CAST(@DFrom-@i as FLOAT),0,1)) BETWEEN DTF AND DTT 
+   )b , P_GoodPrices GP WHERE GP.Price_ID = b.Price_ID AND GP.Good_ID = G1.Good_ID AND b.Fl_Gen = 1
+
+   ORDER BY DTT-DTF)a
+)
+ 
+WHERE G1.Good_ID = Goods.Good_ID) Price
+
+FROM Goods WHERE Good_ID IN (
+SELECT DISTINCT BKG.Good_ID FROM BindKontrGoods BKG, BindGoodGroups BGG , Goods G WHERE G.Good_ID = BGG.Good_ID AND
+BKG.Good_ID = BGG.Good_ID AND BKG.Kontr_ID=@Kontr_ID AND BGG.GoodG_ID IN (55,56)))a)
+	
+		SET @i = @i-1
+	END
+	UPDATE #WEB_Res SET Price = @Price WHERE Kontr_ID = @Kontr_ID	
+	
+    FETCH NEXT FROM Price_Cur INTO @Kontr_ID
+END;
+
+CLOSE Price_Cur;
+DEALLOCATE Price_Cur;
+SELECT * FROM #WEB_res
+DROP TABLE #WEB_res
+')
+
+
+
+--список категорий свободных номеров с ценами-------------------------------------
+--возвращает список свободных категорий с кол-вои номеров. Указанной категории сверху, затем все которые больше или равны по указанному кол-ву людей с учётом доп.мест
+--кол-во доступных номеров, мест, доп.мест, название категории, ID категории, URL, цена, описание --------
+--занятых мест основных, занятых мест дополниетльных----------------------------------------------------
+IF (SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_NAME LIKE '%WEB_RoomCatList%') <> 0
+DROP PROCEDURE [dbo].WEB_RoomCatList
+EXEC( 'CREATE PROCEDURE [dbo].[WEB_RoomCatList]
+	@DFrom datetime,              --дата с
+	@DTo datetime,	              --дата по
+	@QAdult int,                  --взрослых
+	@QChild int,                  --детей
+	@Cat_ID int=0,                --категория 0 -если не выбрана (получение списка категорий SELECT * FROM R_Class)
+	@QRoom int=1,                 --кол-во номеров по умолчанию 1
+	@ChildAge nvarchar(255)='''', --возраст детей через запятую
+	@Client_ID int=0              --код клиента
+AS
+
+DECLARE @Price Float=0, @i float, @Kontr_ID int, @MidPlace int, @cQP int
+DECLARE @cQPD int, @cDop int, @cGr1 int =55, @cGr2 int = 56, @Fl_N int, @cQTY int = 1
+
+	SET NOCOUNT ON;
+	
+	SET @MidPlace = CEILING((@QAdult+@QChild)/@QRoom)
+	
+--выбраная категория вначале
+SELECT COUNT(*) CNT, a.QP, a.QPD, a.Cat, a.RClass_ID, a.URL, a.Price, a.Descript
+, (SELECT TOP 1 Kontr_ID FROM KontrAttr KA WHERE AtType_ID = 11 AND AttrValue = a.Cat
+AND a.QP = (SELECT AttrValue FROM KontrAttr KA1 WHERE AtType_ID = 8 AND KA1.Kontr_ID = KA.Kontr_ID)) Kontr_ID
+, 0 as cQP, 0 as cQPD
+INTO #WEB_res FROM
+(SELECT K.*, (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 8 AND Kontr_ID = K.Kontr_ID) QP --мест
+,(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 14 AND Kontr_ID = K.Kontr_ID) QPD--доп.мест
+,(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID) Cat--категория
+,(SELECT RClass_ID FROM R_Class WHERE RClassName = (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID)) AS RClass_ID
+,(SELECT URL FROM R_Class WHERE RClassName = (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID)) AS URL
+,0 Price
+,(SELECT Descr FROM R_Class WHERE RClassName = (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID)) AS Descript--описание класса
+FROM Kontragents K WHERE K.Kontr_ID IN (SELECT Kontr_ID FROM KontrAttr WHERE AtType_ID = 11 AND ((SELECT Fl_Serv FROM R_Class WHERE RClassName = AttrValue) IS NULL OR (SELECT Fl_Serv FROM R_Class WHERE RClassName = AttrValue) = 0))
+AND (SELECT COUNT(*) FROM Documents D WHERE DocT_ID IN (31,32,33,34,35,36) AND D.Kontr_ID = K.Kontr_ID AND D.DocDate <=@DTo AND D.DocDateTo >= @DFrom) =0
+AND K.Kontr_ID IN (SELECT Kontr_ID FROM KontrAttr WHERE AtType_ID = 11 AND AttrValue = (SELECT RClassName FROM R_Class WHERE RClass_ID = @Cat_ID))
+UNION ALL 
+SELECT K.*, (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 8 AND Kontr_ID = K.Kontr_ID) QP --мест
+,(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 14 AND Kontr_ID = K.Kontr_ID) QPD--доп.мест
+,(SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID) Cat--категория
+,(SELECT RClass_ID FROM R_Class WHERE RClassName = (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID)) AS RClass_ID
+,(SELECT URL FROM R_Class WHERE RClassName = (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID)) AS URL
+,0 Price
+,(SELECT Descr FROM R_Class WHERE RClassName = (SELECT AttrValue FROM KontrAttr WHERE AtType_ID = 11 AND Kontr_ID = K.Kontr_ID)) AS Descript--описание класса
+FROM Kontragents K WHERE K.Kontr_ID IN (SELECT Kontr_ID FROM KontrAttr WHERE AtType_ID = 11 AND ((SELECT Fl_Serv FROM R_Class WHERE RClassName = AttrValue) IS NULL OR (SELECT Fl_Serv FROM R_Class WHERE RClassName = AttrValue) = 0))
+AND (SELECT COUNT(*) FROM Documents D WHERE DocT_ID IN (31,32,33,34,35,36) AND D.Kontr_ID = K.Kontr_ID AND D.DocDate <=@DTo AND D.DocDateTo >= @DFrom) =0
+AND K.Kontr_ID NOT IN (SELECT Kontr_ID FROM KontrAttr WHERE AtType_ID = 11 AND AttrValue = (SELECT RClassName FROM R_Class WHERE RClass_ID = @Cat_ID))
+)a 
+WHERE a.RClass_ID IS NOT NULL AND CAST(a.QP AS INT)+CAST(a.QPD AS INT) >= @MidPlace
+GROUP BY a.QP, a.QPD, a.Cat, a.RClass_ID, a.URL, a.Price, a.Descript 
+
+DECLARE Price_Cur CURSOR FOR
+SELECT Kontr_ID, QP, QPD FROM #WEB_res
+
+OPEN Price_Cur;
+
+FETCH NEXT FROM Price_Cur INTO @Kontr_ID, @cQP, @cQPD;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+
+	SET @Price = 0
+	SET @i = CAST(@DTo - @DFrom AS FLOAT)
+	SET @cDop = @MidPlace-@cQP
+	IF @cDop < 0 SET @cDop = 0
+	
+	--определим по номеру или по месту
+	SET @Fl_N = (SELECT COUNT(*) FROM BindKontrGoods BKG, BindGoodGroups BGG , Goods G WHERE G.Good_ID = BGG.Good_ID AND 
+            BKG.Good_ID = BGG.Good_ID AND BKG.Kontr_ID=@Kontr_ID AND BGG.GoodG_ID IN (55,56) 
+            AND Dim_ID IN (SELECT Dim_ID FROM Tarifs))
+
+	IF @Fl_N > 0 
+	BEGIN
+		SET @cGr1 = 55
+		SET @cGr2 = 56		
+	END
+	ELSE
+	BEGIN
+		SET @cGr1 = 65
+		SET @cGr2 = 66	
+		SET @cQTY = @MidPlace-@cDop	
+	END
+		
+	WHILE @i > 0
+	BEGIN
+--найдем периодические услуги для номера или места при бронировании
+		SET @Price = @Price + (SELECT ISNULL(SUM(Price),0)*@cQTY FROM
+(SELECT 
+(SELECT CASE WHEN (PriceVal = 0 OR PriceVal is Null) THEN Price ELSE PriceVal END Price FROM Goods G1 
+LEFT OUTER JOIN P_GoodPrices GP ON GP.Good_ID = G1.Good_ID AND GP.Price_ID IN 
+(SELECT Price_ID FROM (
+SELECT TOP 1 b.Price_ID, b.Fl_Gen FROM ( 
+   SELECT * FROM ( 
+
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE a.DF <> 0 AND a.DT <> 0 AND @DTo-@i BETWEEN DTF AND DTT 
+
+   UNION ALL SELECT * FROM ( 
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE (a.DF = 0 OR a.DT = 0) AND (CAST(@DTo-@i as FLOAT)-ROUND(CAST(@DTo-@i as FLOAT),0,1)) BETWEEN DTF AND DTT 
+   )b , P_GoodPrices GP WHERE GP.Price_ID = b.Price_ID AND GP.Good_ID = G1.Good_ID AND b.Fl_Gen = 1
+
+   ORDER BY DTT-DTF)a
+)
+ 
+WHERE G1.Good_ID = Goods.Good_ID) Price
+
+FROM Goods WHERE Good_ID IN (
+SELECT DISTINCT BKG.Good_ID FROM BindKontrGoods BKG, BindGoodGroups BGG , Goods G WHERE G.Good_ID = BGG.Good_ID AND
+BKG.Good_ID = BGG.Good_ID AND BKG.Kontr_ID=@Kontr_ID AND BGG.GoodG_ID IN (@cGr1,@cGr2))
+AND Dim_ID IN (SELECT Dim_ID FROM Tarifs)
+)a)
+
+--если есть дополнительные места - их посчитаем отдельно
+IF @cDop > 0
+BEGIN
+		SET @Price = @Price + (SELECT ISNULL(SUM(Price),0)*@cDop FROM
+(SELECT 
+(SELECT CASE WHEN (PriceVal = 0 OR PriceVal is Null) THEN Price ELSE PriceVal END Price FROM Goods G1 
+LEFT OUTER JOIN P_GoodPrices GP ON GP.Good_ID = G1.Good_ID AND GP.Price_ID IN 
+(SELECT Price_ID FROM (
+SELECT TOP 1 b.Price_ID, b.Fl_Gen FROM ( 
+   SELECT * FROM ( 
+
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE a.DF <> 0 AND a.DT <> 0 AND @DTo-@i BETWEEN DTF AND DTT 
+
+   UNION ALL SELECT * FROM ( 
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE (a.DF = 0 OR a.DT = 0) AND (CAST(@DTo-@i as FLOAT)-ROUND(CAST(@DTo-@i as FLOAT),0,1)) BETWEEN DTF AND DTT 
+   )b , P_GoodPrices GP WHERE GP.Price_ID = b.Price_ID AND GP.Good_ID = G1.Good_ID AND b.Fl_Gen = 1
+
+   ORDER BY DTT-DTF)a
+)
+ 
+WHERE G1.Good_ID = Goods.Good_ID) Price
+
+FROM Goods WHERE Good_ID IN (
+SELECT DISTINCT BKG.Good_ID FROM BindKontrGoods BKG, BindGoodGroups BGG , Goods G WHERE G.Good_ID = BGG.Good_ID AND
+BKG.Good_ID = BGG.Good_ID AND BKG.Kontr_ID=@Kontr_ID AND BGG.GoodG_ID IN (57,58))
+AND Dim_ID IN (SELECT Dim_ID FROM Tarifs)
+)a)
+	
+END
+	   SET @i = @i-1
+
+	END
+--непериодические услуги
+		SET @Price = @Price + (SELECT ISNULL(SUM(Price),0) FROM
+(SELECT 
+(SELECT CASE WHEN (PriceVal = 0 OR PriceVal is Null) THEN Price ELSE PriceVal END Price FROM Goods G1 
+LEFT OUTER JOIN P_GoodPrices GP ON GP.Good_ID = G1.Good_ID AND GP.Price_ID IN 
+(SELECT Price_ID FROM (
+SELECT TOP 1 b.Price_ID, b.Fl_Gen FROM ( 
+   SELECT * FROM ( 
+
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE a.DF <> 0 AND a.DT <> 0 AND @DFrom BETWEEN DTF AND DTT 
+
+   UNION ALL SELECT * FROM ( 
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE (a.DF = 0 OR a.DT = 0) AND (CAST(@DFrom as FLOAT)-ROUND(CAST(@DFrom as FLOAT),0,1)) BETWEEN DTF AND DTT 
+   )b , P_GoodPrices GP WHERE GP.Price_ID = b.Price_ID AND GP.Good_ID = G1.Good_ID AND b.Fl_Gen = 1
+
+   ORDER BY DTT-DTF)a
+)
+ 
+WHERE G1.Good_ID = Goods.Good_ID) Price
+
+FROM Goods WHERE Good_ID IN (
+SELECT DISTINCT BKG.Good_ID FROM BindKontrGoods BKG, BindGoodGroups BGG , Goods G WHERE G.Good_ID = BGG.Good_ID AND
+BKG.Good_ID = BGG.Good_ID AND BKG.Kontr_ID=@Kontr_ID AND BGG.GoodG_ID IN (@cGr1,@cGr2))
+AND Dim_ID NOT IN (SELECT Dim_ID FROM Tarifs)
+)a)
+
+
+--Print ''a - '' +CAST(@Kontr_ID as varchar) + '' -b- '' + CAST(@cQP as VARCHAR) +'' -c- ''+ 
+--	CAST(@cQPD as varchar) + ''-d- ''+CAST(@cDop as varchar) +'' -e- ''+
+--	CAST(@MidPlace-@cDop as varchar)
+
+
+	UPDATE #WEB_Res SET Price = @Price, cQP = (@MidPlace-@cDop), cQPD = @cDop  WHERE Kontr_ID = @Kontr_ID	
+	
+    FETCH NEXT FROM Price_Cur INTO @Kontr_ID, @cQP, @cQPD
+END;
+
+CLOSE Price_Cur;
+DEALLOCATE Price_Cur;
+SELECT * FROM #WEB_res
+DROP TABLE #WEB_res
+')
+
+
+
+--список доп.услуг с ценами-----------------------------------------------------
+--возвращет список услуг из группы доп услуги с ценами на начало бронирования---
+--ID услуги, наименование, ед.изм, цена-----------------------------------------
+IF (SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_NAME LIKE '%WEB_ServList%') <> 0
+DROP PROCEDURE [dbo].WEB_ServList
+EXEC( 'CREATE PROCEDURE [dbo].[WEB_ServList]
+	@DFrom datetime, --дата с
+	@DTo datetime,	 --дата по
+	@Client_ID int=0 --код клиента
+AS
+
+	SET NOCOUNT ON;
+
+SELECT G.Good_ID, G.GoodName, DM.DimName 
+,
+(SELECT CASE WHEN (PriceVal = 0 OR PriceVal is Null) THEN Price ELSE PriceVal END Price FROM Goods G1 
+LEFT OUTER JOIN P_GoodPrices GP ON GP.Good_ID = G1.Good_ID AND GP.Price_ID IN 
+(SELECT Price_ID FROM (
+SELECT TOP 1 b.Price_ID, b.Fl_Gen FROM ( 
+   SELECT * FROM ( 
+
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE a.DF <> 0 AND a.DT <> 0 AND @DFrom BETWEEN DTF AND DTT 
+
+   UNION ALL SELECT * FROM ( 
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE (a.DF = 0 OR a.DT = 0) AND (CAST(@DFrom as FLOAT)-ROUND(CAST(@DFrom as FLOAT),0,1)) BETWEEN DTF AND DTT 
+   )b , P_GoodPrices GP WHERE GP.Price_ID = b.Price_ID AND GP.Good_ID = G1.Good_ID AND b.Fl_Gen = 1
+
+   ORDER BY DTT-DTF)a
+)
+WHERE G1.Good_ID = G.Good_ID) Price
+
+FROM Goods G, Dimensions DM
+WHERE Good_ID IN (SELECT Good_ID FROM BindGoodGroups WHERE GoodG_ID = 61) AND G.Dim_ID = DM.Dim_ID
+')
+
+
+
+--список броней по клиенту с состоянием оплаты-----------------------------------
+--ID брони, тип, номер, категория, клиент, дата с, дата по, тип оплаты, плательщик, примечание, наличие счёта, сумма услуг, сумма оплаты---
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[WEB_BronList]') AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[WEB_BronList]
+EXEC('CREATE PROCEDURE [dbo].[WEB_BronList]
+		@Client_ID int=0 --код клиента
+AS
+
+	SET NOCOUNT ON;
+
+SELECT D.Doc_ID, D.DocT_ID, K.KontrName, KA1.AttrValue, K1.KontrName Client, convert(varchar,D.DocDate,4) as DocDate
+,  convert(varchar,D.DocDateTo,4) as DocDateTo,
+DA1.DAttrValue, ISNULL(K2.KontrName,K1.KontrName) Plat, D.Comment, 
+        --наличие счёта
+CAST(CASE WHEN (SELECT COUNT(*) FROM Documents D4, BindDocuments BD4 WHERE D4.DocT_ID=30001 AND BD4.SecDoc_ID=D4.Doc_ID AND BD4.Doc_ID = D.Doc_ID)>0 THEN 1 ELSE 0 END AS BIT) FL_Sch,
+(SELECT TOP 1 D4.DocNumber FROM Documents D4, BindDocuments BD4 WHERE D4.DocT_ID=30001 AND BD4.SecDoc_ID=D4.Doc_ID AND BD4.Doc_ID = D.Doc_ID) as N_Sch,
+(SELECT TOP 1 D4.Doc_ID FROM Documents D4, BindDocuments BD4 WHERE D4.DocT_ID=30001 AND BD4.SecDoc_ID=D4.Doc_ID AND BD4.Doc_ID = D.Doc_ID) as ID_Sch
+        --услуги
+,ROUND(ISNULL((SELECT SUM(DocSumDisc) FROM Documents D2 WHERE D2.Doc_ID IN
+(SELECT D.Doc_ID UNION ALL SELECT D3.Doc_ID FROM Documents D3, BindDocuments BD1 WHERE D3.Doc_ID = BD1.SecDoc_ID AND D3.DocT_ID IN (11, 12, 31, 32, 33, 34) AND BD1.Doc_ID = D.Doc_ID)),0)
+       --оплата
+-ISNULL((SELECT SUM(BindSum) FROM Documents D1, BindDocuments BD WHERE D1.Doc_ID = BD.SecDoc_ID AND D1.DocT_ID IN (20) AND BD.Doc_ID IN
+(SELECT D.Doc_ID UNION ALL SELECT D4.Doc_ID FROM Documents D4, BindDocuments BD2 WHERE D4.Doc_ID = BD2.SecDoc_ID AND D4.DocT_ID IN (11, 12, 31, 32, 33, 34) AND BD2.Doc_ID = D.Doc_ID)),0),2) SumDolg
+
+FROM Documents D 
+LEFT OUTER JOIN DocAttr DA1 ON DA1.Doc_ID = D.Doc_ID AND DA1.DAtType_ID = 12 --группа для группового бронирования
+LEFT OUTER JOIN DocAttr DA11 INNER JOIN Kontragents K2 ON K2.Kontr_ID = DA11.DAttrValue
+ON DA11.Doc_ID = D.Doc_ID AND DA11.DAtType_ID = 11 --плательщик
+INNER JOIN Kontragents K 
+LEFT OUTER JOIN KontrAttr KA1 ON KA1.Kontr_ID = K.Kontr_ID AND KA1.AtType_ID = 11
+ON K.Kontr_ID = D.Kontr_ID 
+INNER JOIN Kontragents K1 ON K1.Kontr_ID = D.KontrTo_ID
+WHERE D.DocT_ID IN (31,32) AND K1.Kontr_ID = @Client_ID
+')
+
+
+--формирование брони по одному номеру с гостями, плательщиком и списком доп.услуг------------
+--возвращает ID брони или 0 если номер занят-------------------------------------------------
+IF (SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_NAME LIKE '%WEB_BronAdd%') <> 0
+DROP PROCEDURE [dbo].WEB_BronAdd
+EXEC( 'CREATE PROCEDURE [dbo].[WEB_BronAdd]
+	@DFrom datetime,                --дата с
+	@DTo datetime,	                --дата по
+	@QAdult int,                    --взрослых
+	@QChild int,                    --детей
+	@Room_ID int,                   --ID номера
+	@Client_ID int,                 --код клиента
+	@Plat_ID int,                   --код плательщика
+	@ChildAge nvarchar(255)='''',   --возраст детей через ,
+	@GuestNames nvarchar(255)='''', --имена гостей через ,
+	@GuestBirth nvarchar(255)='''', --д.рождения гостей через ,
+	@GuestPassp nvarchar(255)='''', --паспорта гостей через ,
+	@DServ nvarchar(255)='''',      --список ID доп.услуг через ,
+	@NGrp int=0                     --номер группы
+
+AS
+
+DECLARE @Price Float=0, @i float, @Doc_ID int
+
+	SET NOCOUNT ON;
+	
+--проверка на занятость номера
+IF (SELECT COUNT(*) FROM Documents D WHERE DocT_ID IN (31,32,33,34,35,36) 
+   AND D.Kontr_ID = @Room_ID AND D.DocDate <=@DTo AND D.DocDateTo >= @DFrom) > 0
+BEGIN
+	SELECT 0 -- номер занят
+	RETURN 0 -- выходим
+
+END
+
+--добавим документ бронь
+INSERT INTO Documents ([DocDate],[DocDateTo],[DocNumber],[Comment],[DocSum],[DocDisc],[DocSumDisc],[User_ID],[Kontr_ID],[KontrTo_ID],[Curr_ID],[DocT_ID]) VALUES
+         (@DFrom,@DTo,''0'',''WEB Bron'',0,0,0,1,@Room_ID,@Client_ID,1,31)
+SET @Doc_ID = (SELECT SCOPE_IDENTITY())
+
+--атрибуты документа
+    --мест
+    INSERT INTO DocAttr (DAtType_ID, Doc_ID, DAttrValue) SELECT 1,@Doc_ID,AttrValue FROM KontrAttr WHERE AtType_ID = 8 AND Kontr_ID = @Room_ID
+    --доп.мест
+    INSERT INTO DocAttr (DAtType_ID, Doc_ID, DAttrValue) SELECT 5,@Doc_ID,AttrValue FROM KontrAttr WHERE AtType_ID = 8 AND Kontr_ID = @Room_ID
+    --код плательщика
+    INSERT INTO DocAttr (DAtType_ID, Doc_ID, DAttrValue) VALUES (11,@Doc_ID,@Plat_ID)
+    --группа
+    IF @NGrp > 0 
+    BEGIN
+      INSERT INTO DocAttr (DAtType_ID, Doc_ID, DAttrValue) VALUES (12,@Doc_ID,@NGrp)
+    END
+
+
+	SET @i = CAST(@DTo - @DFrom AS FLOAT)
+	WHILE @i > 0
+	BEGIN
+		--добавим услуги для номера при бронировании
+
+INSERT INTO DocDet ([Quant], QPor, Price, [Good_ID], [SortOrder], Dim_ID, Doc_ID, Discount) SELECT 
+1,1,
+CASE WHEN (PriceVal = 0 OR PriceVal is Null) THEN Price ELSE PriceVal END Price
+,G1.Good_ID, 0, Dim_ID, @Doc_ID, 0 FROM Goods G1 
+LEFT OUTER JOIN P_GoodPrices GP ON GP.Good_ID = G1.Good_ID AND GP.Price_ID IN 
+(SELECT Price_ID FROM (
+SELECT TOP 1 b.Price_ID, b.Fl_Gen FROM ( 
+   SELECT * FROM ( 
+
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE a.DF <> 0 AND a.DT <> 0 AND @DFrom-@i BETWEEN DTF AND DTT 
+
+   UNION ALL SELECT * FROM ( 
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE (a.DF = 0 OR a.DT = 0) AND (CAST(@DFrom-@i as FLOAT)-ROUND(CAST(@DFrom-@i as FLOAT),0,1)) BETWEEN DTF AND DTT 
+   )b , P_GoodPrices GP WHERE GP.Price_ID = b.Price_ID AND GP.Good_ID = G1.Good_ID AND b.Fl_Gen = 1
+
+   ORDER BY DTT-DTF)a
+)
+WHERE G1.Good_ID IN (
+SELECT DISTINCT BKG.Good_ID FROM BindKontrGoods BKG, BindGoodGroups BGG , Goods G WHERE G.Good_ID = BGG.Good_ID AND
+BKG.Good_ID = BGG.Good_ID AND BKG.Kontr_ID=@Room_ID AND BGG.GoodG_ID IN (55,56))
+	
+		SET @i = @i-1
+	END
+
+	SELECT @Doc_ID --вернём код документа	
+')
+
+
+
+
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[WEB_BronCatAdd]') AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[WEB_BronCatAdd]
+EXEC('CREATE PROCEDURE [dbo].[WEB_BronCatAdd]
+	@DFrom datetime,                --дата с
+	@DTo datetime,	                --дата по
+	@QAdult int,                    --взрослых
+	@QChild int,                    --детей
+	@Cat_ID int,                    --ID категории
+	@Client_ID int,                 --код клиента
+	@Plat_ID int,                   --код плательщика
+	@ChildAge nvarchar(255)='''',   --возраст детей через ,
+	@GuestNames nvarchar(255)='''', --имена гостей через ,
+	@GuestBirth nvarchar(255)='''', --д.рождения гостей через ,
+	@GuestPassp nvarchar(255)='''', --паспорта гостей через ,
+	@DServ nvarchar(255)='''',      --список ID доп.услуг через ,
+	@NGrp int=0                     --номер группы
+
+AS
+DECLARE @NomerDoc varchar(20)
+DECLARE @Price Float=0, @i float, @Doc_ID int, @Room_ID int = 0, @cDop int = 0
+DECLARE @cQP int, @cGr1 int =55, @cGr2 int = 56, @Fl_N int, @cQTY int = 1
+
+	SET NOCOUNT ON;
+
+--выберем первый свободный номер из категории
+SET @Room_ID = ISNULL((SELECT TOP 1 KA.Kontr_ID FROM KontrAttr KA WHERE AtType_ID = 11 AND AttrValue = 
+(SELECT RClassName FROM R_Class WHERE RClass_ID =@Cat_ID) AND 
+(SELECT COUNT(*) FROM Documents D WHERE DocT_ID IN (31,32,33,34,35,36) 
+   AND D.Kontr_ID = KA.Kontr_ID AND D.DocDate <=@DTo AND D.DocDateTo >= @DFrom) = 0),0)
+
+IF @Room_ID = 0
+BEGIN
+	SELECT 0 -- номер занят
+	RETURN 0 -- выходим
+
+END
+
+SET @NomerDoc=''20''+CONVERT(varchar,GETDATE(),12)+''_''+ replace(CONVERT(varchar,GETDATE(),8),'':'','''')
+
+--добавим документ бронь
+INSERT INTO Documents ([DocDate],[DocDateTo],[DocNumber],[Comment],[DocSum],[DocDisc],[DocSumDisc],[User_ID],[Kontr_ID],[KontrTo_ID],[Curr_ID],[DocT_ID]) VALUES
+         (@DFrom+CAST((SELECT TOP 1 ConstVal FROM Constants WHERE ConstName =''CheckIn'') as FLOAT),
+         @DTo+CAST((SELECT TOP 1 ConstVal FROM Constants WHERE ConstName =''CheckOut'') as FLOAT),@NomerDoc,''WEB Бронь'',0,0,0,1,@Room_ID,@Client_ID,1,31)
+SET @Doc_ID = (SELECT SCOPE_IDENTITY())
+
+    SET @cQP = ISNULL((SELECT TOP 1 AttrValue FROM KontrAttr WHERE AtType_ID = 8 AND Kontr_ID = @Room_ID),0)
+	SET @cDop = @QAdult+@QChild-@cQP
+	IF @cDop < 0 SET @cDop = 0
+
+	--определим по номеру или по месту
+	SET @Fl_N = (SELECT COUNT(*) FROM BindKontrGoods BKG, BindGoodGroups BGG , Goods G WHERE G.Good_ID = BGG.Good_ID AND 
+            BKG.Good_ID = BGG.Good_ID AND BKG.Kontr_ID=@Room_ID AND BGG.GoodG_ID IN (55,56) 
+            AND Dim_ID IN (SELECT Dim_ID FROM Tarifs))
+
+	IF @Fl_N > 0 
+	BEGIN
+		SET @cGr1 = 55
+		SET @cGr2 = 56		
+	END
+	ELSE
+	BEGIN
+		SET @cGr1 = 65
+		SET @cGr2 = 66	
+		SET @cQTY = @QAdult+@QChild-@cDop				
+	END
+	
+	
+--атрибуты документа
+    --мест
+    INSERT INTO DocAttr (DAtType_ID, Doc_ID, DAttrValue) SELECT 1,@Doc_ID,@QAdult+@QChild-@cDop
+    --доп.мест
+    INSERT INTO DocAttr (DAtType_ID, Doc_ID, DAttrValue) SELECT 5,@Doc_ID,@cDop
+    --код плательщика
+    INSERT INTO DocAttr (DAtType_ID, Doc_ID, DAttrValue) VALUES (11,@Doc_ID,@Plat_ID)
+    --группа
+    IF @NGrp > 0 
+    BEGIN
+      INSERT INTO DocAttr (DAtType_ID, Doc_ID, DAttrValue) VALUES (12,@Doc_ID,@NGrp)
+    END
+
+	SET @i = CAST(@DTo - @DFrom AS FLOAT)
+	WHILE @i > 0
+	BEGIN
+		--добавим услуги для номера при бронировании
+
+INSERT INTO DocDet ([Quant], QPor, Price, [Good_ID], [SortOrder], Dim_ID, Doc_ID, Discount) 
+--найдем периодические услуги для номера при бронировании
+SELECT @cQTY,1,
+CASE WHEN (PriceVal = 0 OR PriceVal is Null) THEN Price ELSE PriceVal END Price
+,G1.Good_ID, 0, Dim_ID, @Doc_ID, 0 FROM Goods G1 
+LEFT OUTER JOIN P_GoodPrices GP ON GP.Good_ID = G1.Good_ID AND GP.Price_ID IN 
+(SELECT Price_ID FROM (
+SELECT TOP 1 b.Price_ID, b.Fl_Gen FROM ( 
+   SELECT * FROM ( 
+
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE a.DF <> 0 AND a.DT <> 0 AND @DFrom-@i BETWEEN DTF AND DTT 
+
+   UNION ALL SELECT * FROM ( 
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE (a.DF = 0 OR a.DT = 0) AND (CAST(@DFrom-@i as FLOAT)-ROUND(CAST(@DFrom-@i as FLOAT),0,1)) BETWEEN DTF AND DTT 
+   )b , P_GoodPrices GP WHERE GP.Price_ID = b.Price_ID AND GP.Good_ID = G1.Good_ID AND b.Fl_Gen = 1
+
+   ORDER BY DTT-DTF)a
+)
+WHERE G1.Good_ID IN (
+SELECT DISTINCT BKG.Good_ID FROM BindKontrGoods BKG, BindGoodGroups BGG , Goods G WHERE G.Good_ID = BGG.Good_ID AND
+BKG.Good_ID = BGG.Good_ID AND BKG.Kontr_ID=@Room_ID AND BGG.GoodG_ID IN (@cGr1, @cGr2))
+AND Dim_ID IN (SELECT Dim_ID FROM Tarifs)
+--если есть дополнительные места - их посчитаем отдельно
+UNION ALL	
+SELECT @cDop,1,
+CASE WHEN (PriceVal = 0 OR PriceVal is Null) THEN Price ELSE PriceVal END Price
+,G1.Good_ID, 0, Dim_ID, @Doc_ID, 0 FROM Goods G1 
+LEFT OUTER JOIN P_GoodPrices GP ON GP.Good_ID = G1.Good_ID AND GP.Price_ID IN 
+(SELECT Price_ID FROM (
+SELECT TOP 1 b.Price_ID, b.Fl_Gen FROM ( 
+   SELECT * FROM ( 
+
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE a.DF <> 0 AND a.DT <> 0 AND @DFrom-@i BETWEEN DTF AND DTT 
+
+   UNION ALL SELECT * FROM ( 
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE (a.DF = 0 OR a.DT = 0) AND (CAST(@DFrom-@i as FLOAT)-ROUND(CAST(@DFrom-@i as FLOAT),0,1)) BETWEEN DTF AND DTT 
+   )b , P_GoodPrices GP WHERE GP.Price_ID = b.Price_ID AND GP.Good_ID = G1.Good_ID AND b.Fl_Gen = 1
+
+   ORDER BY DTT-DTF)a
+)
+WHERE G1.Good_ID IN (
+SELECT DISTINCT BKG.Good_ID FROM BindKontrGoods BKG, BindGoodGroups BGG , Goods G WHERE G.Good_ID = BGG.Good_ID AND
+BKG.Good_ID = BGG.Good_ID AND BKG.Kontr_ID=@Room_ID AND BGG.GoodG_ID IN (57,58))
+AND Dim_ID IN (SELECT Dim_ID FROM Tarifs) AND @cDop > 0
+--непериодические услуги
+UNION ALL	
+SELECT 1,1,
+CASE WHEN (PriceVal = 0 OR PriceVal is Null) THEN Price ELSE PriceVal END Price
+,G1.Good_ID, 0, Dim_ID, @Doc_ID, 0 FROM Goods G1 
+LEFT OUTER JOIN P_GoodPrices GP ON GP.Good_ID = G1.Good_ID AND GP.Price_ID IN 
+(SELECT Price_ID FROM (
+SELECT TOP 1 b.Price_ID, b.Fl_Gen FROM ( 
+   SELECT * FROM ( 
+
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE a.DF <> 0 AND a.DT <> 0 AND @DFrom-@i BETWEEN DTF AND DTT 
+
+   UNION ALL SELECT * FROM ( 
+   SELECT P.Price_ID,P.Fl_Gen, ISNULL(DateFrom,0) DF, ISNULL(DateTo,0) DT, ISNULL(TimeFrom,0) TF, ISNULL(TimeTo,0) TT, 
+   ISNULL(DateFrom,0) + ISNULL(TimeFrom,0) DTF, ISNULL(DateTo,0)+ISNULL(TimeTo,0) DTT FROM P_Prices P, P_PriceDate PD 
+   WHERE P.Price_ID = PD.Price_ID)a 
+   WHERE (a.DF = 0 OR a.DT = 0) AND (CAST(@DFrom-@i as FLOAT)-ROUND(CAST(@DFrom-@i as FLOAT),0,1)) BETWEEN DTF AND DTT 
+   )b , P_GoodPrices GP WHERE GP.Price_ID = b.Price_ID AND GP.Good_ID = G1.Good_ID AND b.Fl_Gen = 1
+
+   ORDER BY DTT-DTF)a
+)
+WHERE G1.Good_ID IN (
+SELECT DISTINCT BKG.Good_ID FROM BindKontrGoods BKG, BindGoodGroups BGG , Goods G WHERE G.Good_ID = BGG.Good_ID AND
+BKG.Good_ID = BGG.Good_ID AND BKG.Kontr_ID=@Room_ID AND BGG.GoodG_ID IN (@cGr1, @cGr2))
+AND Dim_ID NOT IN (SELECT Dim_ID FROM Tarifs)
+
+
+		SET @i = @i-1
+	END
+
+--пересчёт суммы документа
+  UPDATE Documents SET DocSum = 
+     (SELECT ISNULL(SUM(a.Sum1),0) FROM (SELECT ISNULL(ROUND(SUM(Quant*Price),2),0) Sum1 FROM DocDet Where Doc_ID = @Doc_ID GROUP BY Good_ID)a) ,
+     DocDisc = 
+     (SELECT ISNULL(SUM(a.Sum1),0) FROM (SELECT ISNULL(ROUND(SUM(Discount),2),0) Sum1 FROM DocDet Where Doc_ID = @Doc_ID GROUP BY Good_ID)a) ,
+     DocSumDisc = 
+     (SELECT ISNULL(SUM(a.Sum1),0) FROM (SELECT ISNULL(ROUND(SUM(Quant*Price),2),0)-ISNULL(ROUND(SUM(Discount),2),0) Sum1 FROM DocDet Where Doc_ID = @Doc_ID GROUP BY Good_ID)a) WHERE Doc_ID = @Doc_ID
+
+
+
+	SELECT @Doc_ID --вернём код документа	
+')
+
+
+
+--формирование счёта по ID брони с указанием формы оплаты-----------------------
+IF (SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_NAME LIKE '%WEB_InvoiceCr%') <> 0
+DROP PROCEDURE [dbo].WEB_InvoiceCr
+EXEC( 'CREATE PROCEDURE [dbo].[WEB_InvoiceCr]
+	@Doc_ID int,   --ID брони
+	@Opl_ID int=0, --тип оплаты
+	@NGrp int=0    --номер группы
+
+AS
+
+DECLARE @Inv_ID int = 0, @Det_ID int = 0
+
+	SET NOCOUNT ON;
+
+--добавляем документ - счёт
+  INSERT INTO Documents ([DocDate],[DocDateTo],[DocNumber],[DocSum],[DocDisc],[DocSumDisc],[User_ID],[Kontr_ID],[KontrTo_ID],[Curr_ID],[DocT_ID]) SELECT TOP 1
+       GetDate(),GetDate(),D.Doc_ID,DocSum,DocDisc,DocSumDisc,1,Kontr_ID,KontrTo_ID,1,30001
+       FROM Documents D WHERE D.Doc_ID = @Doc_ID
+
+  SET @Inv_ID = (SELECT SCOPE_IDENTITY())
+
+--3 - атрибут тип оплаты
+--20 - атрибут фирма
+
+
+--привязка к брони
+  INSERT INTO [BindDocuments] ([Doc_ID] ,[SecDoc_ID]) SELECT 
+ 	Doc_ID,@Inv_ID FROM Documents WHERE Doc_ID IN (@Doc_ID)
+
+--периоды документа
+  INSERT INTO [R_DocPeriod] ([Doc_ID] ,Kontr_ID, KontrTo_ID, DateFr, DateTo, Comment) SELECT 
+       @Inv_ID, Kontr_ID, KontrTo_ID, DocDate, DocDateTo, '''' FROM Documents WHERE Doc_ID IN (@Doc_ID)
+
+
+  --добавляем услуги
+	INSERT INTO DocDet (QPor,Quant,Dim_ID,Price,Doc_ID,Discount,Good_ID,State,SortOrder,Kontr_ID) SELECT QPor,Quant,Dim_ID,Price,
+	@Inv_ID,Discount,Good_ID,DD.State,SortOrder,DD.Kontr_ID
+	FROM DocDet DD, Documents D WHERE D.Doc_ID = DD.Doc_ID AND DD.Doc_ID IN (@Doc_ID)
+
+    SET @Det_ID = (SELECT SCOPE_IDENTITY())
+                             
+	--привязка к бронированию
+    INSERT INTO BindDocDet (Det_ID,SecDet_ID,Quant) SELECT Det_ID,@Det_ID,0 FROM DocDet WHERE 
+	Doc_ID = @Doc_ID
+
+
+    --флаг счёта
+    UPDATE DocDet Set Fl_Vstr = 1 WHERE Doc_ID = @Doc_ID
+
+
+--Вернём данные счёта
+SELECT D.Doc_ID, D.DocT_ID, D.DocDate, D.DocDateTo, D.DocNumber,
+       CASE WHEN KA31.AttrValue IS NULL THEN K.KontrName ELSE KA31.AttrValue END KontrName, U.UserName, D.DocSum, 
+       --скидка без скидки турсбора
+       D.DocDisc - ISNULL((SELECT SUM(DD.Discount) FROM DocDet DD WHERE DD.Doc_ID = @Inv_ID AND DD.Good_ID = 6),0) DocDisc
+       --сумма со скидкой без суммы турсбора
+       , D.DocSumDisc - ISNULL((SELECT SUM(ROUND(DD.Price*DD.Quant,2)-DD.Discount) FROM DocDet DD WHERE DD.Doc_ID = @Inv_ID
+               AND DD.Good_ID = 6),0) DocSumDiscWOTS
+       --сумма без скидки без суммы турсбора
+       , D.DocSum - ISNULL((SELECT SUM(ROUND(DD.Price*DD.Quant,2)) FROM DocDet DD WHERE DD.Doc_ID = @Inv_ID
+                AND DD.Good_ID = 6),0) DocSumWOTS
+       , D.DocSumDisc, C.CurrShortName, ISNULL(PT.PayTName,''неоплачен.'') PayTName
+       , ISNULL(DA.DAttrValue,0) DA, ISNULL(DA1.DAttrValue,0) DA1, ISNULL(DA2.DAttrValue,0) DA2 
+       , ISNULL(DA3.DAttrValue,0) DA3, CAST(CAST(DA2.DAttrValue as FLOAT) as DateTime) DD2 
+       , KA.AttrValue F 
+       ,DD.Quant, DD.Price, G.GoodName, DM.DimName
+        FROM Documents D 
+        LEFT OUTER JOIN DocAttr DA ON DA.DAtType_ID = 1 AND DA.Doc_ID = D.Doc_ID
+        LEFT OUTER JOIN DocAttr DA1 ON DA1.DAtType_ID = 5 AND DA1.Doc_ID = D.Doc_ID
+        LEFT OUTER JOIN DocAttr DA2 ON DA2.DAtType_ID = 6 AND DA2.Doc_ID = D.Doc_ID
+        LEFT OUTER JOIN DocAttr DA3 LEFT OUTER JOIN PayTypes PT ON PT.PayT_ID = DA3.DAttrValue 
+        ON DA3.DAtType_ID = 3 AND DA3.Doc_ID = D.Doc_ID 
+       , Kontragents K 
+        LEFT OUTER JOIN KontrAttr KA ON KA.AtType_ID = 4 AND K.Kontr_ID = KA.Kontr_ID 
+        LEFT OUTER JOIN KontrAttr KA31 ON KA31.AtType_ID = 31 AND K.Kontr_ID = KA31.Kontr_ID 
+       , Users U, Currenc C 
+       ,DocDet DD, Goods G, Dimensions DM WHERE DD.Doc_ID = D.Doc_ID AND G.Good_ID = DD.Good_ID AND DM.Dim_ID = DD.Dim_ID
+	AND D.KontrTo_ID = K.Kontr_ID
+        AND D.User_ID = U.User_ID AND C.Curr_ID = D.Curr_ID AND D.Doc_ID = @Inv_ID
+
+--ID счёта, тип, дата с, дата по, номер, плтельщик, кто выписал, сумма без скидки,  
+--скидка без скидки турсбора
+       --сумма со скидкой без суммы турсбора
+       --сумма без скидки без суммы турсбора
+--сумма со скидкой, валюта, тип оплаты, мест, допмест, рассрочка, код типа оплаты, адрес плат., 
+--строки кол-во, цена, наименование, ед.изм
+
+')
+
+
+
+--Информация по категориям номеров-----------------------------------
+--возвращает данные категории. Если не указана - все категории-------
+--ID, название, Описание, Флаг служебная, URL------------------------
+IF (SELECT COUNT(*) FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_NAME LIKE '%WEB_CatList%') <> 0
+DROP PROCEDURE [dbo].WEB_CatList
+EXEC( 'CREATE PROCEDURE [dbo].[WEB_CatList]
+	@Cat_ID int
+AS
+
+	SET NOCOUNT ON;
+
+	--(возвращает пароль из базы или пустую строку если емайл не существует)
+	IF @Cat_ID <> 0
+		SELECT RClass_ID, RClassName, Descr, FL_Serv, URL FROM R_Class WHERE RClass_ID = @Cat_ID 
+	ELSE 
+		SELECT RClass_ID, RClassName, Descr, FL_Serv, URL FROM R_Class
+')
+
+
+
+
+------------вовращает данные для счёта-----------------------
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[WEB_InvoicePrint]') AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[WEB_InvoicePrint]
+EXEC('CREATE PROCEDURE [dbo].[WEB_InvoicePrint]
+	@Inv_ID nvarchar(255)   --ID счёта
+AS
+
+--Вернём данные счёта
+SELECT D.Doc_ID, D.DocT_ID, D.DocDate, D.DocDateTo, D.DocNumber,
+       CASE WHEN KA31.AttrValue IS NULL THEN K.KontrName ELSE KA31.AttrValue END KontrName, U.UserName, D.DocSum, 
+       --скидка без скидки турсбора
+       D.DocDisc - ISNULL((SELECT SUM(DD.Discount) FROM DocDet DD WHERE DD.Doc_ID = @Inv_ID AND DD.Good_ID = 6),0) DocDisc
+       --сумма со скидкой без суммы турсбора
+       , D.DocSumDisc - ISNULL((SELECT SUM(ROUND(DD.Price*DD.Quant,2)-DD.Discount) FROM DocDet DD WHERE DD.Doc_ID = @Inv_ID
+               AND DD.Good_ID = 6),0) DocSumDiscWOTS
+       --сумма без скидки без суммы турсбора
+       , D.DocSum - ISNULL((SELECT SUM(ROUND(DD.Price*DD.Quant,2)) FROM DocDet DD WHERE DD.Doc_ID = @Inv_ID
+                AND DD.Good_ID = 6),0) DocSumWOTS
+       , D.DocSumDisc, C.CurrShortName, ISNULL(PT.PayTName,''неоплачен.'') PayTName
+       , ISNULL(DA.DAttrValue,0) DA, ISNULL(DA1.DAttrValue,0) DA1, ISNULL(DA2.DAttrValue,0) DA2 
+       , ISNULL(DA3.DAttrValue,0) DA3, CAST(CAST(DA2.DAttrValue as FLOAT) as DateTime) DD2 
+       , KA.AttrValue F 
+       ,DD.Quant, DD.Price, G.GoodName, DM.DimName, D.DateMod
+        FROM Documents D 
+        LEFT OUTER JOIN DocAttr DA ON DA.DAtType_ID = 1 AND DA.Doc_ID = D.Doc_ID
+        LEFT OUTER JOIN DocAttr DA1 ON DA1.DAtType_ID = 5 AND DA1.Doc_ID = D.Doc_ID
+        LEFT OUTER JOIN DocAttr DA2 ON DA2.DAtType_ID = 6 AND DA2.Doc_ID = D.Doc_ID
+        LEFT OUTER JOIN DocAttr DA3 LEFT OUTER JOIN PayTypes PT ON PT.PayT_ID = DA3.DAttrValue 
+        ON DA3.DAtType_ID = 3 AND DA3.Doc_ID = D.Doc_ID 
+       , Kontragents K 
+        LEFT OUTER JOIN KontrAttr KA ON KA.AtType_ID = 4 AND K.Kontr_ID = KA.Kontr_ID 
+        LEFT OUTER JOIN KontrAttr KA31 ON KA31.AtType_ID = 31 AND K.Kontr_ID = KA31.Kontr_ID 
+       , Users U, Currenc C 
+       ,DocDet DD, Goods G, Dimensions DM WHERE DD.Doc_ID = D.Doc_ID AND G.Good_ID = DD.Good_ID AND DM.Dim_ID = DD.Dim_ID
+	AND D.KontrTo_ID = K.Kontr_ID
+        AND D.User_ID = U.User_ID AND C.Curr_ID = D.Curr_ID AND D.Doc_ID = CAST(@Inv_ID AS INT)
+')
+
+
+
+
+
+-------------реквизиты фирмы----------------------                             
+--KontrNAme-наименование, F адр., F1 тел., F2 факс, F3 емайл, F4 р/с, F5 МФО, F6 ЕДРПОУ, F7 Инд.№, F8 № свид-ва, F9 %НДС
+IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[WEB_FirmRekviz]') AND type in (N'P', N'PC'))
+DROP PROCEDURE [dbo].[WEB_FirmRekviz]
+EXEC('CREATE PROCEDURE [dbo].[WEB_FirmRekviz]
+	@Inv_ID int   --ID счёта
+AS
+
+SELECT TOP 1 KontrName, KA.AttrValue F, KA1.AttrValue F1, KA2.AttrValue F2, KA3.AttrValue F3, KA4.AttrValue F4, KA5.AttrValue F5, KA6.AttrValue F6, KA7.AttrValue F7, KA8.AttrValue F8, KA9.AttrValue F9 
+ FROM Kontragents K
+ LEFT OUTER JOIN KontrAttr KA ON KA.AtType_ID = 4 AND K.Kontr_ID = KA.Kontr_ID 
+ LEFT OUTER JOIN KontrAttr KA1 ON KA1.AtType_ID = 1 AND K.Kontr_ID = KA1.Kontr_ID
+ LEFT OUTER JOIN KontrAttr KA2 ON KA2.AtType_ID = 2 AND K.Kontr_ID = KA2.Kontr_ID
+ LEFT OUTER JOIN KontrAttr KA3 ON KA3.AtType_ID = 3 AND K.Kontr_ID = KA3.Kontr_ID
+ LEFT OUTER JOIN KontrAttr KA4 ON KA4.AtType_ID = 18 AND K.Kontr_ID = KA4.Kontr_ID
+ LEFT OUTER JOIN KontrAttr KA5 ON KA5.AtType_ID = 19 AND K.Kontr_ID = KA5.Kontr_ID
+ LEFT OUTER JOIN KontrAttr KA6 ON KA6.AtType_ID = 20 AND K.Kontr_ID = KA6.Kontr_ID
+ LEFT OUTER JOIN KontrAttr KA7 ON KA7.AtType_ID = 5 AND K.Kontr_ID = KA7.Kontr_ID
+ LEFT OUTER JOIN KontrAttr KA8 ON KA8.AtType_ID = 6 AND K.Kontr_ID = KA8.Kontr_ID
+ LEFT OUTER JOIN KontrAttr KA9 ON KA9.AtType_ID = 21 AND K.Kontr_ID = KA9.Kontr_ID
+ WHERE K.Kontr_ID = (SELECT DAttrValue FROM DocAttr WHERE DAtType_ID = 20 AND Doc_ID = @Inv_ID)
+
+')

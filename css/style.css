@@ -1,0 +1,148 @@
+﻿body{
+    font-size: 9pt;
+}
+
+ul.category-list li{
+    padding: 10px;
+    margin:10px;
+    list-style-image: none;
+    min-height: 80px;
+}
+
+ul.category-list{
+    list-style-image: none;
+    list-style: none;
+    margin-left: -40px;
+}
+
+ul.category-list li h3{
+    margin: -10px;
+    padding:5px;
+    width:500px;
+    float:left;
+}
+
+ul.category-list li p{
+    width: 90%
+}
+
+.float-left{ float: left}
+.float-right{ float: right}
+button.order{
+    margin-top: 2px;
+}
+
+#room-search{
+    padding: 10px;
+    width:250px;
+    margin: 10px;
+    font-size: 12pt;
+}
+
+.room-search-field{
+    float:left;
+    width:150px;    
+}
+
+#room-search-left{
+    float:left;
+    width:170px;
+}
+
+.clear{clear:both;}
+
+#room-search-button{
+    margin-left: 60px;
+}
+
+#room-search h3{
+    margin: -10px -10px 10px -10px;
+    text-align: center;
+}
+
+h3{
+    margin: 0;
+}
+
+.bar{
+    margin:2px;
+    padding:0px;
+}
+
+.search-bar{
+    margin:2px;
+    height: 80px;
+}
+
+.search-bar .column{
+    margin:10px;
+    float:left;
+    height: 70px;
+    width:130px;
+    
+}
+
+.search-bar .column input{
+	width: 100px;
+}
+
+.logo{
+    margin: 10px;
+}
+
+.header{
+    height:120px;
+}
+
+.header-right{    
+    float:right;
+    width:300px;
+    padding: 10px;
+    height: 100px;
+    border-left-width: 1px;
+    border-left-color: #cccccc;
+    border-left-style: solid;
+}
+
+#signin-dialog .label{
+    width:100px;
+    font-weight: bold;
+}
+
+#signin-dialog input{
+    width:200px;
+}
+
+.search-results{
+    margin-top: 30px;
+}
+
+.right-buttons{
+    float:right;
+    width:110px;
+    margin-top: 23px;
+    margin-right: -80px;
+}
+.right-buttons button,.right-buttons a{
+    float:left;
+    margin: 1;
+    width:110px;
+}
+
+.list-price{
+    float:right;
+    color:orange;
+    font-weight: bold;
+    font-size: 16pt;
+     margin-right: 30px;
+}
+
+.taken-places{
+    float:left;
+}
+
+.price-disclaymer{
+    float:right;
+    font-size: smaller;
+    margin: 3px 10px 2px 0;
+}

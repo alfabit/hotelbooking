@@ -1,0 +1,12 @@
+<div id="hb-reg-form">
+    <div></div>
+</div>
+
+
+<?php
+/* 
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+
+?>

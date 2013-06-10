@@ -1,0 +1,336 @@
+Запрос:
+--проверка регистрации клиента (емайл пароль)-----------------------------------
+--возвращает данные контрагента по его email, если такого нет NULL-------
+--ID, ФИО, email, пароль, день рождения, страна, адрес, паспорт, контакт-----
+
+<form action="http://192.168.10.3:8080/ws/KontragentTest.xml" method="post" enctype="application/x-www-form-urlencoded">
+  <input type="hidden" name="string:email" value="donets@newlogic.ua" />
+  <input type="hidden" name="string:pass" value="1" />
+
+  <input type="submit" value="Выполнить Запрос">
+</form>
+
+Результат:
+
+<dataset>
+<row>
+<Kontr_ID>1668</Kontr_ID>
+<KontrName>КОЖЕВНИКОВ ИГОРЬ ЕВГЕНИЕВИЧ</KontrName>
+<email>donets@newlogic.ua</email>
+<Pass>null</Pass>
+<birth>null</birth>
+<Country_ID>null</Country_ID>
+<Addr>
+КИЇВ ВУЛ. Б. ХМЕЛЬНИЦЬКОГО 17\52А БЦ"ЛЕОНАРДО" ОФІС 523
+</Addr>
+<Passport>null</Passport>
+<Contact>null</Contact>
+</row>
+</dataset>
+
+
+
+Запрос:
+--добавление, редактирование, контрагента по email------------------------
+--(возвращает ID контрагента при добавлении или изменении. При смене пароля если пароль не совпадает то возвращает 0)
+
+<form action="http://192.168.10.3:8080/ws/KontragentAdd.xml" method="post" enctype="application/x-www-form-urlencoded">
+  <input type="hidden" name="string:email" value="123@newlogic.ua" />
+  <input type="hidden" name="string:pass" value="1" />
+  <input type="hidden" name="string:FName" value="1" />
+  <input type="hidden" name="string:MName" value="2" />
+  <input type="hidden" name="string:LName" value="3" />
+  <input type="hidden" name="string:birth" value="01.01.1991" />
+  <input type="hidden" name="integer:Country_ID" value="1" />
+  <input type="hidden" name="string:Addr" value="addr1" />
+  <input type="hidden" name="string:Passport" value="passport1" />
+  <input type="hidden" name="string:Contact" value="contact1" />
+
+  <input type="submit" value="Выполнить Запрос">
+</form>
+
+
+<dataset>
+<row>
+<_empty_>5900</_empty_>
+</row>
+</dataset>
+
+
+
+--список свободных номеров с ценами-------------------------------------
+--возвращает список свободных номеров. Номера по указанной категории сверху, затем все которые больше или равны по указанному кол-ву людей с учётом доп.мест
+--ID номера, Название номера, мест, доп.мест, категория, цена, описание--------
+
+<form action="http://192.168.10.3:8080/ws/WEB_RoomList.xml" method="post" enctype="application/x-www-form-urlencoded">
+  <input type="hidden" name="decimal:DFrom" value="40670" />
+  <input type="hidden" name="decimal:DTo" value="40672" />
+  <input type="hidden" name="integer:QAdult" value="1" />
+  <input type="hidden" name="integer:QChild" value="0" />
+
+  <input type="submit" value="Выполнить Запрос">
+</form>
+
+
+<dataset>
+<row>
+<Kontr_ID>925</Kontr_ID>
+<KontrName>102</KontrName>
+<QP>1</QP>
+<QPD>1</QPD>
+<Cat>Одн.стандартний</Cat>
+<Price>799</Price>
+<Descript>Стандарт</Descript>
+</row>
+<row>
+<Kontr_ID>902</Kontr_ID>
+<KontrName>104</KontrName>
+<QP>1</QP>
+<QPD>1</QPD>
+<Cat>Одн.стандартний</Cat>
+<Price>799</Price>
+<Descript>Стандарт</Descript>
+</row>
+<row>
+<Kontr_ID>908</Kontr_ID>
+<KontrName>106</KontrName>
+<QP>1</QP>
+<QPD>1</QPD>
+<Cat>Одн.стандартний</Cat>
+<Price>799</Price>
+<Descript>Стандарт</Descript>
+</row>
+</dataset>
+
+
+
+
+--список доп.услуг с ценами-----------------------------------------------------
+--возвращет список услуг из группы доп услуги с ценами на начало бронирования---
+--ID услуги, наименование, ед.изм, цена---------
+
+<form action="http://192.168.10.3:8080/ws/WEB_ServList.xml" method="post" enctype="application/x-www-form-urlencoded">
+  <input type="hidden" name="decimal:DFrom" value="40670" />
+  <input type="hidden" name="decimal:DTo" value="40672" />
+
+  <input type="submit" value="Выполнить Запрос">
+</form>
+
+
+
+<dataset>
+<row>
+<Good_ID>4</Good_ID>
+<GoodName>Проживання Стандарт</GoodName>
+<DimName>Дб.</DimName>
+<Price>393.0</Price>
+</row>
+<row>
+<Good_ID>5</Good_ID>
+<GoodName>Проживання одн.1 кат.</GoodName>
+<DimName>Дб.</DimName>
+<Price>435.0</Price>
+</row>
+<row>
+<Good_ID>14</Good_ID>
+<GoodName>Номер для переговор. год.</GoodName>
+<DimName>Час.</DimName>
+<Price>83.333</Price>
+</row>
+</dataset>
+
+
+
+
+--формирование брони по одному номеру с гостями, плательщиком и списком доп.услуг------------
+--возвращает ID брони или 0 если номер занят-------------
+
+<form action="http://192.168.10.3:8080/ws/WEB_BronAdd.xml" method="post" enctype="application/x-www-form-urlencoded">
+  <input type="hidden" name="decimal:DFrom" value="40688" />
+  <input type="hidden" name="decimal:DTo" value="40690" />
+  <input type="hidden" name="integer:QAdult" value="1" />
+  <input type="hidden" name="integer:QChild" value="0" />
+  <input type="hidden" name="integer:Room_ID" value="127" />
+  <input type="hidden" name="integer:Client_ID" value="5900" />
+  <input type="hidden" name="integer:Plat_ID" value="5900" />
+
+  <input type="submit" value="Выполнить Запрос">
+</form>
+
+
+<dataset>
+<row>
+<_empty_>20420</_empty_>
+</row>
+</dataset>
+
+
+
+
+--список броней по клиенту с состоянием оплаты-----------------------------------
+--ID брони, тип, номер, категория, клиент, дата с, дата по, тип оплаты, плательщик, примечание, наличие счёта, сумма услуг, сумма оплаты---
+
+<form action="http://192.168.10.3:8080/ws/WEB_BronList.xml" method="post" enctype="application/x-www-form-urlencoded">
+  <input type="hidden" name="decimal:Client_ID" value="5900" />
+
+  <input type="submit" value="Выполнить Запрос">
+</form>
+
+
+<dataset>
+<row>
+<Doc_ID>20420</Doc_ID>
+<DocT_ID>31</DocT_ID>
+<KontrName>КОТЮРГІН ДЕНИС ОЛЕГОВИЧ</KontrName>
+<AttrValue>Напівлюкс 2к/2м</AttrValue>
+<Client>1 2 3</Client>
+<DocDate>2011-05-27 00:00:00.0</DocDate>
+<DocDateTo>2011-05-29 00:00:00.0</DocDateTo>
+<DAttrValue>null</DAttrValue>
+<Plat>1 2 3</Plat>
+<Comment>WEB Bron</Comment>
+<FL_Sch>false</FL_Sch>
+<SumDolg>0.0</SumDolg>
+</row>
+</dataset>
+
+
+
+
+--формирование счёта по ID брони с указанием формы оплаты-----------------------
+--ID счёта, тип, дата с, дата по, номер, плтельщик, кто выписал, сумма без скидки,  
+--скидка без скидки турсбора
+       --сумма со скидкой без суммы турсбора
+       --сумма без скидки без суммы турсбора
+--сумма со скидкой, валюта, тип оплаты, мест, допмест, рассрочка, код типа оплаты, адрес плат., 
+--строки кол-во, цена, наименование, ед.изм
+
+<form action="http://192.168.10.3:8080/ws/WEB_InvoiceCr.xml" method="post" enctype="application/x-www-form-urlencoded">
+  <input type="hidden" name="decimal:Doc_ID" value="20420" />
+
+  <input type="submit" value="Выполнить Запрос">
+</form>
+
+
+<dataset>
+<row>
+<Doc_ID>20421</Doc_ID>
+<DocT_ID>30001</DocT_ID>
+<DocDate>2011-05-04 14:32:15.37</DocDate>
+<DocDateTo>2011-05-04 14:32:15.37</DocDateTo>
+<DocNumber>20420</DocNumber>
+<KontrName>1 2 3</KontrName>
+<UserName>Admin</UserName>
+<DocSum>0.0</DocSum>
+<DocDisc>0.0</DocDisc>
+<DocSumDiscWOTS>-8.469999999999999</DocSumDiscWOTS>
+<DocSumWOTS>-8.469999999999999</DocSumWOTS>
+<DocSumDisc>0.0</DocSumDisc>
+<CurrShortName>ГРН</CurrShortName>
+<PayTName>неоплачен.</PayTName>
+<DA>1</DA>
+<DA1>0</DA1>
+<DA2>0</DA2>
+<DA3>0</DA3>
+<DD2>null</DD2>
+<F>addr1</F>
+<Quant>1.0</Quant>
+<Price>174.0</Price>
+<GoodName>Ранній заїзд одн.1 кат.</GoodName>
+<DimName>Шт.</DimName>
+</row>
+<row>
+<Doc_ID>20421</Doc_ID>
+<DocT_ID>30001</DocT_ID>
+<DocDate>2011-05-04 14:32:15.37</DocDate>
+<DocDateTo>2011-05-04 14:32:15.37</DocDateTo>
+<DocNumber>20420</DocNumber>
+<KontrName>1 2 3</KontrName>
+<UserName>Admin</UserName>
+<DocSum>0.0</DocSum>
+<DocDisc>0.0</DocDisc>
+<DocSumDiscWOTS>-8.469999999999999</DocSumDiscWOTS>
+<DocSumWOTS>-8.469999999999999</DocSumWOTS>
+<DocSumDisc>0.0</DocSumDisc>
+<CurrShortName>ГРН</CurrShortName>
+<PayTName>неоплачен.</PayTName>
+<DA>1</DA>
+<DA1>0</DA1>
+<DA2>0</DA2>
+<DA3>0</DA3>
+<DD2>null</DD2>
+<F>addr1</F>
+<Quant>1.0</Quant>
+<Price>870.0</Price>
+<GoodName>Пізн. виїзд Напівлюкс 2к</GoodName>
+<DimName>Шт.</DimName>
+</row>
+</dataset>
+
+
+
+
+--список категорий свободных номеров с ценами-------------------------------------
+--возвращает список свободных категорий с кол-вои номеров. Указанной категории сверху, затем все которые больше или равны по указанному кол-ву людей с учётом доп.мест
+--кол-во доступных номеров, мест, доп.мест, название категории, ID категории, URL, цена, описание --------
+
+<form action="http://localhost:8080/ws/WEB_RoomCatList.xml" method="post" enctype="application/x-www-form-urlencoded">
+  <input type="hidden" name="decimal:DFrom" value="40000" />
+  <input type="hidden" name="decimal:DTo" value="40000" />
+  <input type="hidden" name="integer:QAdult" value="1" />
+  <input type="hidden" name="integer:QChild" value="0" />
+
+  <input type="submit" value="Выполнить Запрос">
+</form>
+
+
+<dataset>
+    <row>
+        <CNT>30</CNT>
+        <QP>1</QP>
+        <QPD>1</QPD>
+        <RClassName>Одн.стандартний</RClassName>
+        <RClass_ID>7</RClass_ID>
+        <URL></URL>
+        <Price>0</Price>
+        <Descript>Стандарт</Descript>
+        <Kontr_ID>902</Kontr_ID>
+    </row>
+    <row>
+        <CNT>2</CNT>
+        <QP>1</QP>
+        <QPD>2</QPD>
+        <RClassName>Одн. з каміном </RClassName>
+        <RClass_ID>8</RClass_ID>
+        <URL></URL>
+        <Price>0</Price>
+        <Descript>З каміном</Descript>
+        <Kontr_ID>890</Kontr_ID>
+    </row>
+</dataset>
+
+
+
+
+
+--формирование брони по одному номеру из категории с гостями, плательщиком и списком доп.услуг------------
+--возвращает ID брони или 0 если нет свободных номеров-------------
+
+<form action="http://192.168.10.3:8080/ws/WEB_BronCatAdd.xml" method="post" enctype="application/x-www-form-urlencoded">
+  <input type="hidden" name="decimal:DFrom" value="40688" />
+  <input type="hidden" name="decimal:DTo" value="40690" />
+  <input type="hidden" name="integer:QAdult" value="1" />
+  <input type="hidden" name="integer:QChild" value="0" />
+  <input type="hidden" name="integer:Cat_ID" value="1" />
+  <input type="hidden" name="integer:Client_ID" value="5900" />
+  <input type="hidden" name="integer:Plat_ID" value="5900" />
+
+  <input type="submit" value="Выполнить Запрос">
+</form>
+
+
+<dataset>
+<row>
+<_empty_>20420</_empty_>
+</row>
+</dataset>
