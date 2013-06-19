@@ -1,8 +1,19 @@
 <?php
     global $profile;
     $name = explode(" ",$profile['KontrName']);
-    
+	$str = $profile['Passport'];
+	if($profile['birth'] == "01.01.2000"){
+		$fisic = false;
+		$passport = $profile['Passport'];
+	}else{
+		$passport = $profile['Passport'];
+		$fisic = true;
+	};
+	if($passport == null || $passport == 'null'){
+		$passport = '';
+	}
 ?>
+
 <style>
     #signup-form input{
         width:200px;
@@ -21,6 +32,7 @@ $(function() {
         }
         catch(e){}
 });
+
 </script>
 
 <div id="profile-tabs">
@@ -52,27 +64,49 @@ $(function() {
                 <input type="password" id="reg-npass2"/>        
             </div>
 
-            <br/><br/>
-
             <div id="reg-additional">
+          <?php if($fisic): ?>
+    		<div id="fisic">
+                <br/><br/>
+                <div>
+                    <div class="label">Фамилия</div>        
+                    <input type="text" id="reg-lastname" name="lastname" value="<?php echo $name[0]; ?>"/>        
+                </div>
+    
+                <div>
+                    <div class="label">Имя</div>        
+                    <input type="text" id="reg-firstname" name="firstname" value="<?php echo $name[1]; ?>"/>        
+                </div>
+    
+                <div>
+                    <div class="label">Отчество</div>        
+                    <input type="text" id="reg-middlename" name="middlename" value="<?php echo $name[2]; ?>"/>        
+                </div>
+                <div>
+                    <div class="label">Дата рождения</div>        
+                    <input type="text" id="reg-birth" name="birth" value="<?php echo $profile['birth']; ?>"/>        
+                </div>  
+                           
+                <div>
+                    <div class="label">Паспорт (серия, номер, кем и когда выдан)</div>        
+                    <input type="text" id="reg-passport" name="passport" value="<?php echo $passport; ?>"/>        
+                </div>
 
-            <div>
-                <div class="label">Фамилия</div>        
-                <input type="text" id="reg-lastname" name="lastname" value="<?php echo $name[0]; ?>"/>        
+		</div>
+        <?php endif; ?>
+        <?php if(!$fisic): ?>
+            <div id="juridic">
+                <br/><br/>
+                <div>
+                    <div class="label">Название компании</div>        
+                    <input type="text" id="reg-addr" name="addr" value="<?php echo $profile["Addr"]; ?>"/>        
+                </div>
+                <div>
+                    <div class="label">Код ЕДРПО *</div>        
+                    <input type="text" id="reg-passport" name="code" value="<?php echo $passport; ?>"/>        
+                </div>
             </div>
-
-            <div>
-                <div class="label">Имя</div>        
-                <input type="text" id="reg-firstname" name="firstname" value="<?php echo $name[1]; ?>"/>        
-            </div>
-
-            <div>
-                <div class="label">Отчество</div>        
-                <input type="text" id="reg-middlename" name="middlename" value="<?php echo $name[2]; ?>"/>        
-            </div>
-
-       
-
+            <?php endif; ?>
             <br/><br/>
 
             <div>
@@ -83,31 +117,28 @@ $(function() {
                     <option value="3">Белорусия</option>            
                 </select>
             </div>
-
-            <div>
-                <div class="label">Дата рождения</div>        
-                <input type="text" id="reg-birth" name="birth" value="<?php echo $profile['birth']; ?>"/>        
-            </div>
-
-            <div>
-                <div class="label">Аддресс</div>        
-                <input type="text" id="reg-addr" name="addr" value="<?php echo $profile['Addr']; ?>"/>        
-            </div>
-
-             <div>
-                <div class="label">Паспорт (серия, номер, кем и когда выдан)</div>        
-                <input type="text" id="reg-passport" name="passport" value="<?php echo $profile['Passport']; ?>"/>        
-            </div>
-
+            
             <div>
                 <div class="label">Контактный телефон</div>        
                 <input type="text" id="reg-contact" name="contact" value="<?php echo $profile['Contact']; ?>"/>        
             </div>
 
+
             </div>
         </div>
     </div>
+	<?php if($fisic){ ?>
+        <script>
+            document.getElementById('juridic').style.display = 'none';
+            document.getElementById('fisic').style.display = 'block';
+        </script>
     
+    <?php }else{ ?>
+        <script>
+            document.getElementById('fisic').style.display = 'none';
+            document.getElementById('juridic').style.display = 'block';
+        </script>
+    <?php } ?>
 <!--    <div id="profile-orders">
         
     </div>-->

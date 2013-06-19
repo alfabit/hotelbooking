@@ -135,10 +135,20 @@ function signUp(){
 }
 
 function signUpOkClick(){
+	var vall = $('#client-type').find(':selected').val();
+	var user;
+	
+	if(vall == 1){
+		user = "fisic";
+	}else if(vall == 2){
+		user = "juridic";
+	}
     var email = $("#reg-email").val();
     var pass = $("#reg-pass").val();
     var pass2 = $("#reg-pass2").val();
-
+	
+	var company = $("#reg-company").val();
+	var code = $("#reg-code").val();
     var firstname = $("#reg-firstname").val();
     var middlename = $("#reg-middlename").val();
     var lastname = $("#reg-lastname").val();
@@ -149,22 +159,27 @@ function signUpOkClick(){
     var passport = $("#reg-passport").val();
     var contact = $("#reg-contact").val();
     
-    if(!validateEmail(email)){messageDialog("Ошибка","Вы ввели неверный email!");return false;}
+    if(!validateEmail(email)){messageDialog("Ошибка","Вы ввели неверный email!");  return false;}
     if(pass!=pass2){messageDialog("Ошибка","Вы ввели разные пароли!");return false;}
     if(pass.length<6){messageDialog("Ошибка","Вы ввели короткий пароль пароль! Минимальная длина - 6 символов");return false;}
-    
-    if(firstname.length<1){messageDialog("Ошибка",'Поле <b>"Имя"</b>  обязательно для заполенения');return false;}
-    if(middlename.length<1){messageDialog("Ошибка",'Поле <b>"Отчество"</b>  обязательно для заполенения');return false;}
-    if(lastname.length<1){messageDialog("Ошибка",'Поле <b>"Фамилия"</b>  обязательно для заполенения');return false;}
-    if(!validateDate(birth)){messageDialog("Ошибка",'Поле <b>"Дата рождения"</b>  обязательно для заполенения. Пример: 20.10.1980');return false;}
-    if(addr.length<3){messageDialog("Ошибка",'Поле <b>"Аддресс"</b>  обязательно для заполенения');return false;}
-    if(passport.length<3){messageDialog("Ошибка",'Поле <b>"Паспорт"</b>  обязательно для заполенения');return false;}
-    if(contact.length<3){messageDialog("Ошибка",'Поле <b>"Контактный телефон"</b>  обязательно для заполенения');return false;}
-    
-    
+	if(contact.length<3){messageDialog("Ошибка",'Поле <b>"Контактный телефон"</b>  обязательно для заполенения');return false;}
+	if(vall == 0){messageDialog("Ошибка",'Поле <b>"Тип клиента"</b>  обязательно для заполенения');return false;}
+    if(user == 'fisic'){
+		if(firstname.length<1){messageDialog("Ошибка",'Поле <b>"Имя"</b>  обязательно для заполенения');return false;}
+		if(lastname.length<1){messageDialog("Ошибка",'Поле <b>"Фамилия"</b>  обязательно для заполенения');return false;}
+		if(birth.length<1){messageDialog("Ошибка",'Поле <b>"Дата рождения"</b>  обязательно для заполенения');return false;}
+	}else{
+		
+		if(company.length<1){messageDialog("Ошибка",'Поле <b>"Название предприятия"</b>  обязательно для заполенения');return false;}
+		if(code.length<1){messageDialog("Ошибка",'Поле <b>"Код ЕДРПО"</b>  обязательно для заполенения');return false;}
+	}
+    	
+
     $.post("controllers/user/signup.php",{
         'email':email,
         'pass':pass,
+		'company':company,
+		'code':code,
         'firstname':firstname,
         'middlename':middlename,
         'lastname':lastname,
@@ -194,7 +209,12 @@ function profile(){
 }
 
 function profileSaveClick(){
-    
+	var fisic;
+	if( $('#fisic').length > 0 ){
+		fisic = true;
+	}else{
+		fisic = false;
+	};
     var pass = $("#reg-pass").val();
     var npass = $("#reg-npass").val();
     var npass2 = $("#reg-npass2").val();
@@ -207,17 +227,17 @@ function profileSaveClick(){
     var addr = $("#reg-addr").val();
     var passport = $("#reg-passport").val();
     var contact = $("#reg-contact").val();
-        
     if(npass!=npass2){messageDialog("Ошибка","Вы ввели разные пароли!");return false;}
     if((npass.length>1)&&(npass.length<6)){messageDialog("Ошибка","Вы ввели слишком короткий новый пароль пароль! Минимальная длина - 6 символов");return false;}
-    
-    if(firstname.length<1){messageDialog("Ошибка",'Поле <b>"Имя"</b>  обязательно для заполенения');return false;}
-    if(middlename.length<1){messageDialog("Ошибка",'Поле <b>"Отчество"</b>  обязательно для заполенения');return false;}
-    if(lastname.length<1){messageDialog("Ошибка",'Поле <b>"Фамилия"</b>  обязательно для заполенения');return false;}
-    if(!validateDate(birth)){messageDialog("Ошибка",'Поле <b>"Дата рождения"</b>  обязательно для заполенения. Пример: 20.10.1980');return false;}
-    if(addr.length<3){messageDialog("Ошибка",'Поле <b>"Аддресс"</b>  обязательно для заполенения');return false;}
-    if(passport.length<3){messageDialog("Ошибка",'Поле <b>"Паспорт"</b>  обязательно для заполенения');return false;}
-    if(contact.length<3){messageDialog("Ошибка",'Поле <b>"Контактный телефон"</b>  обязательно для заполенения');return false;}
+    if((pass.length<1)&&(npass.length<6)){messageDialog("Ошибка",'Поле <b>"Текущий пароль"</b> обязательно для изменения данных');return false;}
+	if(fisic){
+		if(firstname.length<1){messageDialog("Ошибка",'Поле <b>"Имя"</b>  обязательно для заполенения');return false;}
+		if(lastname.length<1){messageDialog("Ошибка",'Поле <b>"Фамилия"</b>  обязательно для заполенения');return false;}
+		if(birth.length<1){messageDialog("Ошибка",'Поле <b>"Дата рождения"</b>  обязательно для заполенения');return false;}
+	}else{
+		if(addr.length<1){messageDialog("Ошибка",'Поле <b>"Название предприятия"</b>  обязательно для заполенения');return false;}
+		if(passport.length<1){messageDialog("Ошибка",'Поле <b>"Код ЕДРПО"</b>  обязательно для заполенения');return false;}
+	}
     
     if(pass.length>4){
         $.post("controllers/user/profile_save.php",{
@@ -238,7 +258,7 @@ function profileSaveClick(){
                         alert("Вы ввели неверный текущий пароль!");
                         break;
                     default:
-                        alert("Вы неверно заполнили поля!");
+						showUserInfo();
                         closeDialog("profile-dialog");
                         break;
                 }                
@@ -479,10 +499,16 @@ function showInvoice(id){
        "Оплатить через Visa, MasterCard или LiqPay":function(){
            payAmount(id);
        },
+	   "Оплатить через Интеркассу":function(){ PayInterKassa(id);
+	   },
        "Закрыть":function(){
            $(this).dialog("close");
        }
    }, "", "controllers/invoice/show.php?id="+id);
+}
+function PayInterKassa(id){
+	var amount = $("#pay_amount_value").val();
+	window.location = "controllers/interkassa/inter_pay.php?id="+id;
 }
 
 function payAmount(id){

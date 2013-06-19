@@ -18,9 +18,15 @@
             $result = (!(stripos($r['content'], "<_empty_>")>0) && $data[0]['Pass']==md5($pass));
             
             if($result){
+				if(trim($data[0]['KontrName']) == " " || trim($data[0]['KontrName']) == ""){
+					$name = $data[0]['Addr'];
+				}else{
+					$name = trim($data[0]['KontrName']);
+				};
                 session_start();
                 $_SESSION['Kontr_ID'] = $data[0]['Kontr_ID'];
-                $_SESSION['KontrName'] = $data[0]['KontrName'];
+                $_SESSION['KontrName'] = $name;
+				//($data[0]['KontrName'] != " " && $data[0]['KontrName'] != "" && isset($data[0]['KontrName']) && !empty($data[0]['KontrName'])) ? $data[0]['KontrName'] : $data[0]['Addr'];
                 $_SESSION['email'] = $data[0]['email'];
                 $_SESSION['birth'] = $data[0]['birth'];
                 $_SESSION['Passport'] = $data[0]['Passport'];

@@ -1,7 +1,6 @@
-﻿<?php
+<?php
 session_start();
 ?>
-
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
     <head>   
@@ -40,7 +39,7 @@ session_start();
                 
             </div>
 <!--            <h3 class="ui-widget-header ui-corner-top">Пансионат "Рута"</h3>-->
-            <img class="logo" src="images/logo_rus.png">
+            <img class="logo" src="images/danland_logo.png">
             
             
         </div>
